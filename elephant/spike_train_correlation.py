@@ -393,6 +393,39 @@ def cross_correlation_histogram(
     spike train (same spike train passed in binned_st1 and binned_st2) the
     maximum correlogram (at lag 0) is 1.
     """
+    def _border_correction(counts, max_num_bins, l, r):
+            # Correct the values taking into account lacking contributes
+            # at the edges
+            correction = float(max_num_bins + 1) / np.array(
+                max_num_bins + 1 - abs(
+                    np.arange(l, r + 1)), float)
+            return counts * correction
+
+    def _kernel_smoothing(counts, kern, l, r):
+        # Define the kern for smoothing as an ndarray
+        if hasattr(kern, '__iter__'):
+            if len(kern) > np.abs(l) + np.abs(r) + 1:
+                raise ValueError(
+                    'The length of the kernel cannot be larger than the '
+                    'length %d of the resulting CCH.' % (
+                        np.abs(l) + np.abs(r) + 1))
+            kern = np.array(kern, dtype=float)
+            kern = 1. * kern / sum(kern)
+        # Check kern parameter
+        else:
+            raise ValueError('Invalid smoothing kernel.')
+
+        # Smooth the cross-correlation histogram with the kern
+        return np.convolve(counts, kern, mode='same')
+
+    def _normalize(counts, norm, l, r):
+        # Rescale the histogram so that the central bin has height 1,
+        # if requested
+        if counts[np.abs(l)] != 0:
+            return counts / counts[np.abs(l)]
+        else:
+            warnings.warn('CCH not normalized because no value for 0 lag')
+            return counts
 
     def _cch_memory(st_1, st_2, win, mode, norm, border_corr, binary, kern):
 
@@ -482,40 +515,15 @@ def cross_correlation_histogram(
             timediff = (timediff[timediff_in_range]).reshape((-1,))
             counts[timediff + np.abs(l)] += st1_bin_counts_unique[idx] * \
                 st2_bin_counts_unique[timediff_in_range]
-
-        # Correct the values taking into account lacking contributes
-        # at the edges
+        # Border correction
         if border_corr is True:
-            correction = float(max_num_bins + 1) / np.array(
-                max_num_bins + 1 - abs(
-                    np.arange(l, r + 1)), float)
-            counts = counts * correction
-
-        # Define the kern for smoothing as an ndarray
-        if hasattr(kern, '__iter__'):
-            if len(kern) > np.abs(l) + np.abs(r) + 1:
-                raise ValueError(
-                    'The length of the kernel cannot be larger than the '
-                    'length %d of the resulting CCH.' % (
-                        np.abs(l) + np.abs(r) + 1))
-            kern = np.array(kern, dtype=float)
-            kern = 1. * kern / sum(kern)
-        # Check kern parameter
-        elif kern is not None:
-            raise ValueError('Invalid smoothing kernel.')
-
-        # Smooth the cross-correlation histogram with the kern
+            counts = _border_correction(counts, max_num_bins, l, r)
         if kern is not None:
-            counts = np.convolve(counts, kern, mode='same')
-
-        # Rescale the histogram so that the central bin has height 1,
-        # if requested
+            # Smoothing
+            counts = _kernel_smoothing(counts, kern, l, r)
         if norm and l <= 0 <= r:
-            if counts[np.abs(l)] != 0:
-                counts = counts / counts[np.abs(l)]
-            else:
-                warnings.warn('CCH not normalized because no value for 0 lag')
-
+            # Normalization
+            counts = _normalize(counts, norm, l, r)
         # Transform the array count into an AnalogSignalArray
         cch_result = neo.AnalogSignalArray(
             signal=counts.reshape(counts.size, 1),
@@ -560,7 +568,7 @@ def cross_correlation_histogram(
                     raise ValueError(
                         "The window exceed the length of the spike trains")
                 # Assign left and right edges of the cch
-                l, r = win[0], win[1]
+                l, r = win
             # Window parameter given in time units
             else:
                 # Check the window parameter values
@@ -596,40 +604,15 @@ def cross_correlation_histogram(
                 r = max(st_2.num_bins - st_1.num_bins, 0)
                 l = min(st_2.num_bins - st_1.num_bins, 0)
         bin_ids = np.r_[l:r + 1]
-
-        # Correct the values taking into account lacking contributes
-        # at the edges
+        # Border correction
         if border_corr is True:
-            correction = float(max_num_bins + 1) / np.array(
-                max_num_bins + 1 - abs(
-                    np.arange(l, r + 1)), float)
-            counts = counts * correction
-
-        # Define the kern for smoothing as an ndarray
-        if hasattr(kern, '__iter__'):
-            if len(kern) > np.abs(l) + np.abs(r) + 1:
-                raise ValueError(
-                    'The length of the kernel cannot be larger than the '
-                    'length %d of the resulting CCH.' % (
-                        np.abs(l) + np.abs(r) + 1))
-            kern = np.array(kern, dtype=float)
-            kern = 1. * kern / sum(kern)
-        # Check kern parameter
-        elif kern is not None:
-            raise ValueError('Invalid smoothing kernel.')
-
-        # Smooth the cross-correlation histogram with the kern
+            counts = _border_correction(counts, max_num_bins, l, r)
         if kern is not None:
-            counts = np.convolve(counts, kern, mode='same')
-
-        # Rescale the histogram so that the central bin has height 1,
-        # if requested
+            # Smoothing
+            counts = _kernel_smoothing(counts, kern, l, r)
         if norm and l <= 0 <= r:
-            if counts[np.abs(l)] != 0:
-                counts = counts / counts[np.abs(l)]
-            else:
-                warnings.warn('CCH not normalized because no value for 0 lag')
-
+            # Normalization
+            counts = _normalize(counts, norm, l, r)
         # Transform the array count into an AnalogSignalArray
         cch_result = neo.AnalogSignalArray(
             signal=counts.reshape(counts.size, 1),
@@ -640,11 +623,11 @@ def cross_correlation_histogram(
         # central one
         return cch_result, bin_ids
 
-    if method is "memory":
+    if method == "memory":
         cch_result, bin_ids = _cch_memory(
             st1, st2, window, mode, normalize, border_correction, binary,
             kernel)
-    elif method is "speed":
+    elif method == "speed":
 
         cch_result, bin_ids = _cch_speed(
             st1, st2, window, mode, normalize, border_correction, binary,
