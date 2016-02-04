@@ -587,8 +587,11 @@ def cross_correlation_histogram(
                     win[1].rescale(binsize.units) / binsize)
 
             # Cross correlate the spike trains
-            corr = np.correlate(st2_arr, st1_arr, mode='full')
-            counts = corr[len(st1_arr)+l+1:len(st1_arr)+1+r+1]
+            st2_arr = np.r_[np.zeros(max(-l, 0)+max(-r, 0)), st2_arr]
+            st2_arr = np.r_[st2_arr, np.zeros(max(r, 0) + max(l, 0))]
+            corr = np.correlate(st2_arr, st1_arr, mode='valid')
+            counts = corr[max(l, 0):-5]
+            #counts = corr[len(st1_arr)+l+1:len(st1_arr)+1+r+1]
 
         # Case generic
         else:
