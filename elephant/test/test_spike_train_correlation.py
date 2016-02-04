@@ -369,6 +369,32 @@ class cross_correlation_histogram_TestCase(unittest.TestCase):
             KeyError, sc.cross_correlation_histogram, self.binned_st1,
             self.binned_st2, mode='dsaij')
 
+    def test_consistency_with_window(self):
+        '''Test consistency between two methods used with window parameter'''
+        windows = [
+                (-20 * pq.ms,  30 * pq.ms),
+                (-30 * pq.ms,  20 * pq.ms),
+                ( 20 * pq.ms,  30 * pq.ms),
+                (-30 * pq.ms, -20 * pq.ms)
+                ]
+
+        for window in windows:
+
+            cch, bin_ids = sc.cross_correlation_histogram(
+                self.binned_st1, self.binned_st2, mode='full', window=window)
+
+            cch_mem, bin_ids_mem = sc.cross_correlation_histogram(
+                self.binned_st1, self.binned_st2, mode='full', window=window,
+                method='memory')
+
+            # Check consistency two methods
+            assert_array_equal(
+                np.squeeze(cch.magnitude), np.squeeze(
+                    cch.magnitude))
+            assert_array_equal(
+                np.squeeze(cch_mem.times), np.squeeze(
+                    cch_mem.times))
+
     def test_normalize_option(self):
         '''
         Test result of a CCH between two binned spike trains with the

@@ -513,7 +513,8 @@ def cross_correlation_histogram(
             ir = np.searchsorted(st2_bin_idx_unique, r+i, side='right')
             timediff = st2_bin_idx_unique[il:ir] - i
             assert ((timediff >=l ) & (timediff <=r)).all()
-            counts[timediff + np.abs(l)] += st2_bin_counts_unique[il:ir]
+            counts[timediff + np.abs(l)] += (st1_bin_counts_unique[idx] *
+                                             st2_bin_counts_unique[il:ir])
             st2_bin_idx_unique = st2_bin_idx_unique[il:]
             st2_bin_counts_unique = st2_bin_counts_unique[il:]
         # Border correction
