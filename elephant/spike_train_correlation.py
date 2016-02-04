@@ -505,16 +505,17 @@ def cross_correlation_histogram(
         # Initialize the counts to an array of zeroes,
         # and the bin IDs to integers
         # spanning the time axis
-        counts = np.zeros(np.abs(l) + np.abs(r) + 1)
+        counts = np.zeros(np.abs(l) + np.abs(r) + 1, dtype=int)
         bin_ids = np.arange(l, r + 1)
         # Compute the CCH at lags in l,...,r only
         for idx, i in enumerate(st1_bin_idx_unique):
-            timediff = st2_bin_idx_unique - i
-            timediff_in_range = np.all(
-                [timediff >= l, timediff <= r], axis=0)
-            timediff = (timediff[timediff_in_range]).reshape((-1,))
-            counts[timediff + np.abs(l)] += st1_bin_counts_unique[idx] * \
-                st2_bin_counts_unique[timediff_in_range]
+            il = np.searchsorted(st2_bin_idx_unique, l+i)
+            ir = np.searchsorted(st2_bin_idx_unique, r+i, side='right')
+            timediff = st2_bin_idx_unique[il:ir] - i
+            assert ((timediff >=l ) & (timediff <=r)).all()
+            counts[timediff + np.abs(l)] += st2_bin_counts_unique[il:ir]
+            st2_bin_idx_unique = st2_bin_idx_unique[il:]
+            st2_bin_counts_unique = st2_bin_counts_unique[il:]
         # Border correction
         if border_corr is True:
             counts = _border_correction(counts, max_num_bins, l, r)
